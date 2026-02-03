@@ -57,6 +57,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
     const velocity = useRef(0)
     const steeringAngle = useRef(0)
     const isFalling = useRef(false)
+    const hasLanded = useRef(false)
     const verticalVelocity = useRef(0)
 
     // Constants
@@ -72,7 +73,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
     const downVector = useMemo(() => new Vector3(0, -1, 0), [])
 
     // Camera state - Dynamic GTA-style camera
-    const cameraOrbit = useRef({ x: 0, y: 0.2 }) // Lower pitch for more behind view
+    const cameraOrbit = useRef({ x: 0, y: 0.35 }) // Slightly higher initial pitch Haus
     const isDragging = useRef(false)
     const cameraDist = useRef(5) // Dynamic distance
 
@@ -161,6 +162,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
 
             if (groundHit) {
                 groundY = groundHit.point.y
+                hasLanded.current = true // Car has officially touched the ground at least once
 
                 // IMPORTANT: Separate Y rotation (heading/steering) from terrain alignment (pitch/roll)
                 // This makes the turn MUCH more visible and responsive
@@ -186,7 +188,9 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
                     MathUtils.lerp(currentEuler.z, targetRoll, delta * 5)
                 )
 
-            } else {
+            } else if (hasLanded.current) {
+                // Only fall if we have already landed once before.
+                // This prevents falling through the floor on initial load before terrain is ready.
                 isFalling.current = true
             }
         }
@@ -202,6 +206,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
                 steeringAngle.current = 0
                 isFalling.current = false
                 verticalVelocity.current = 0
+                hasLanded.current = false // Reset for next spawn
                 carGroupRef.current.position.y = 1
                 carGroupRef.current.rotation.set(0, 0, 0)
             }
@@ -292,7 +297,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
 
         const camX = Math.sin(totalAngle) * cameraDist.current
         const camZ = Math.cos(totalAngle) * cameraDist.current
-        const camY = 0.8 + cameraOrbit.current.y * 3 // Lower camera for cinematic view from below
+        const camY = 1.2 + cameraOrbit.current.y * 3 // Higher base height Haus
 
         // Target camera position
         const targetCamPos = new Vector3(camX, camY + carGroupRef.current.position.y, camZ)
