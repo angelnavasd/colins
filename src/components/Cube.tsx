@@ -7,9 +7,7 @@ interface CubeProps {
 
 const Cube = ({ position }: CubeProps) => {
     const ref = useRef<Group>(null)
-    const [velocity, setVelocity] = useState(new Vector3(0, 0, 0))
-    const [pos, setPos] = useState(new Vector3(...position))
-    const [falling, setFalling] = useState(false)
+    const [pos] = useState(new Vector3(...position))
 
     return (
         <group ref={ref} position={pos.toArray()}>

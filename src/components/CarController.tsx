@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useRef, useMemo, useEffect } from 'react'
-import { Group, Vector3, Mesh, Raycaster, MathUtils } from 'three'
-import { useGLTF } from '@react-three/drei'
+import { Group, Vector3, Raycaster, MathUtils } from 'three'
+import { LamborghiniModel } from './LamborghiniModel'
 
 // Cube state type
 interface CubeState {
@@ -43,12 +43,14 @@ if (typeof window !== 'undefined') {
 }
 
 const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) => {
-    const { scene } = useGLTF('/models/free_porsche_911_carrera_4s.glb')
-    const clonedScene = useMemo(() => scene.clone(), [scene])
     const carGroupRef = useRef<Group>(null)
     const carModelRef = useRef<Group>(null)
-    const frontWheelsRef = useRef<Mesh[]>([]) // Front wheels for steering
-    const rearWheelsRef = useRef<Mesh[]>([])  // Rear wheels (no steering)
+
+    // Individual wheel refs for precise control
+    const flWheel = useRef<Group>(null)
+    const frWheel = useRef<Group>(null)
+    const rlWheel = useRef<Group>(null)
+    const rrWheel = useRef<Group>(null)
     const { camera } = useThree()
 
     // Physics state
@@ -74,61 +76,8 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
     const isDragging = useRef(false)
     const cameraDist = useRef(5) // Dynamic distance
 
-    // Wheel animation
-    const wheelRotation = useRef(0)
-    const wheels = useRef<Mesh[]>([])
-
-    // Find wheels - separate front and rear for steering
-    useEffect(() => {
-        const allWheels: Mesh[] = []
-        const frontWheels: Mesh[] = []
-        const rearWheels: Mesh[] = []
-
-        console.log('🚗 Scanning car model for wheels...')
-        clonedScene.traverse((child) => {
-            // Log all object names to help debug
-            if (child.name) console.log('  Found object:', child.name, 'Type:', child.type)
-
-            if (child instanceof Mesh) {
-                const name = child.name.toLowerCase()
-
-                // Check for wheel/tire/rim keywords
-                if (name.includes('wheel') || name.includes('tire') ||
-                    name.includes('rim') || name.includes('roue') || name.includes('rad')) {
-
-                    console.log('  ✓ Wheel found:', child.name)
-                    allWheels.push(child)
-
-                    // Try to identify front vs rear
-                    if (name.includes('front') || name.includes('fl') || name.includes('fr') ||
-                        name.includes('avant') || name.includes('vorne')) {
-                        frontWheels.push(child)
-                        console.log('    → Front wheel')
-                    } else if (name.includes('rear') || name.includes('rl') || name.includes('rr') ||
-                        name.includes('arriere') || name.includes('hinten')) {
-                        rearWheels.push(child)
-                        console.log('    → Rear wheel')
-                    } else {
-                        // If can't determine, use position Z to guess
-                        // Front wheels typically have positive Z in car models
-                        if (child.position.z > 0) {
-                            frontWheels.push(child)
-                            console.log('    → Front wheel (by position)')
-                        } else {
-                            rearWheels.push(child)
-                            console.log('    → Rear wheel (by position)')
-                        }
-                    }
-                }
-            }
-        })
-
-        wheels.current = allWheels
-        frontWheelsRef.current = frontWheels
-        rearWheelsRef.current = rearWheels
-
-        console.log(`🎯 Final count: ${allWheels.length} wheels (${frontWheels.length} front, ${rearWheels.length} rear)`)
-    }, [clonedScene])
+    // Wheel animation state
+    const wheelRotations = useRef({ fl: 0, fr: 0, rl: 0, rr: 0 })
 
     // Mouse control logic
     useEffect(() => {
@@ -263,38 +212,40 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
 
 
         // --- 4. VISUAL PHYSICS (The "Feel") ---
-        // Body roll (inverse to turn) - REDUCED to prevent 'sinking' look
-        const turnInput = (keys.left ? 1 : 0) - (keys.right ? 1 : 0)
-        // If turning LEFT (1), car leans RIGHT (-Z) - but minimally
-        const targetRoll = -turnInput * (Math.abs(velocity.current) / maxSpeed) * 0.15 // Reduced from 0.5 to 0.15
-        carModelRef.current.rotation.z = MathUtils.lerp(carModelRef.current.rotation.z, targetRoll, delta * 6) // Faster response
+        // Body roll DISABLED - car stays solid and grounded
+        const targetRoll = 0 // No roll - car stays flat when turning
+        carModelRef.current.rotation.z = MathUtils.lerp(carModelRef.current.rotation.z, targetRoll, delta * 8)
 
-        // Pitch - REDUCED to prevent 'sinking' into ground
+        // Pitch - Very subtle, almost imperceptible
         let targetPitch = 0
-        if (keys.forward) targetPitch = -0.03 // Minimal nose lift
-        if (keys.backward || keys.brake) targetPitch = 0.04 // Minimal nose dip
-        carModelRef.current.rotation.x = MathUtils.lerp(carModelRef.current.rotation.x, targetPitch, delta * 3)
+        if (keys.forward) targetPitch = -0.01 // Tiny nose lift
+        if (keys.backward || keys.brake) targetPitch = 0.015 // Tiny nose dip
+        carModelRef.current.rotation.x = MathUtils.lerp(carModelRef.current.rotation.x, targetPitch, delta * 4)
 
-        // Wheel animations - roll and steer (synced with velocity)
-        wheelRotation.current += velocity.current * 2.5 // Better sync
+        // Wheel animations - Individual control for Lamborghini
+        const rotationSpeed = velocity.current * 2.5 // Increased for more visible spin
+        wheelRotations.current.fl += rotationSpeed
+        wheelRotations.current.fr += rotationSpeed
+        wheelRotations.current.rl += rotationSpeed
+        wheelRotations.current.rr += rotationSpeed
 
-        // Front wheels: Roll + Steer (direct input for visibility)
-        const targetSteerAngle = (keys.left ? 0.4 : (keys.right ? -0.4 : 0))
-        frontWheelsRef.current.forEach(wheel => {
-            wheel.rotation.x = wheelRotation.current // Roll
-            wheel.rotation.y = MathUtils.lerp(wheel.rotation.y, targetSteerAngle, delta * 10) // Steer
-        })
+        const targetSteerAngle = (keys.left ? 1.0 : (keys.right ? -1.0 : 0))
+        const smoothSteer = MathUtils.lerp(flWheel.current?.rotation.y || 0, targetSteerAngle, delta * 12)
 
-        // Rear wheels: Just roll
-        rearWheelsRef.current.forEach(wheel => {
-            wheel.rotation.x = wheelRotation.current // Roll only
-        })
+        // Front wheels: Roll (X) + Steer (Y)
+        if (flWheel.current) {
+            flWheel.current.rotation.set(wheelRotations.current.fl, smoothSteer, 0, 'YXZ')
+        }
+        if (frWheel.current) {
+            frWheel.current.rotation.set(wheelRotations.current.fr, smoothSteer, 0, 'YXZ')
+        }
 
-        // All wheels (fallback if front/rear separation failed)
-        if (frontWheelsRef.current.length === 0 && rearWheelsRef.current.length === 0) {
-            wheels.current.forEach(wheel => {
-                wheel.rotation.x = wheelRotation.current
-            })
+        // Rear wheels: Just roll (X)
+        if (rlWheel.current) {
+            rlWheel.current.rotation.set(wheelRotations.current.rl, 0, 0, 'YXZ')
+        }
+        if (rrWheel.current) {
+            rrWheel.current.rotation.set(wheelRotations.current.rr, 0, 0, 'YXZ')
         }
 
 
@@ -351,11 +302,11 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
     })
 
     return (
-        <group ref={carGroupRef} position={[0, 2, 0]}> {/* Start higher to prevent initial fall */}
-            <group ref={carModelRef} position={[0, 0.6, 0]}> {/* Higher to prevent any sinking */}
-                <primitive
-                    object={clonedScene}
-                    scale={[0.8, 0.8, 0.8]}
+        <group ref={carGroupRef} position={[0, 1, 0]}>
+            <group ref={carModelRef} position={[0, 0, 0]}>
+                <LamborghiniModel
+                    wheelRefs={{ fl: flWheel, fr: frWheel, rl: rlWheel, rr: rrWheel }}
+                    scale={[0.01, 0.01, 0.01]}
                     rotation={[0, 0, 0]}
                 />
 
@@ -380,8 +331,6 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
         </group>
     )
 }
-
-useGLTF.preload('/models/free_porsche_911_carrera_4s.glb')
 
 export default CarController
 export type { CubeState }

@@ -1,13 +1,13 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Sky, Stars } from '@react-three/drei'
-import { Suspense, useState, useRef, useMemo } from 'react'
+import { Suspense, useState, useRef } from 'react'
 import { Group, Vector3 } from 'three'
 import Terrain from './components/Terrain'
 import CarController from './components/CarController'
 import type { CubeState } from './components/CarController'
 
 // Cube component that reads from shared state
-function Cube({ state, index }: { state: CubeState, index: number }) {
+function Cube({ state }: { state: CubeState }) {
   const lunarGravity = 0.005
   const airFriction = 0.98
   const groundLevel = 1
@@ -71,7 +71,7 @@ function Game() {
 
   const handleRespawn = () => {
     // Reset all cubes
-    cubeStates.current.forEach((cube, i) => {
+    cubeStates.current.forEach((cube) => {
       cube.position.set(
         (Math.random() - 0.5) * 180,
         1,
@@ -114,7 +114,7 @@ function Game() {
 
         {/* Cubes with lunar physics */}
         {cubeStates.current.map((state, i) => (
-          <Cube key={i} state={state} index={i} />
+          <Cube key={i} state={state} />
         ))}
       </group>
     </>
