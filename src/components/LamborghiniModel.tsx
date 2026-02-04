@@ -53,36 +53,40 @@ export const LamborghiniModel = forwardRef<THREE.Group, ModelProps>((props, ref)
 
   return (
     <group ref={ref} {...rest} dispose={null}>
-      <mesh geometry={nodes.Lamborghini_Aventador_Body.geometry} material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG} />
-      <mesh geometry={nodes.Lamborghini_Aventador_Glass.geometry} material={materials._Lamborghini_AventadorLamborghini_Aventador_GlassSG} />
-      {/* Wheels wrapped in groups at their centers, meshes offset to rotate around pivot */}
-      <group position={centers.fl} ref={wheelRefs?.fl}>
-        <mesh
-          geometry={nodes.Lamborghini_Aventador_Wheel_FL.geometry}
-          material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
-          position={[-centers.fl.x, -centers.fl.y, -centers.fl.z]}
-        />
-      </group>
-      <group position={centers.fr} ref={wheelRefs?.fr}>
-        <mesh
-          geometry={nodes.Lamborghini_Aventador_Wheel_FR.geometry}
-          material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
-          position={[-centers.fr.x, -centers.fr.y, -centers.fr.z]}
-        />
-      </group>
-      <group position={centers.rl} ref={wheelRefs?.rl}>
-        <mesh
-          geometry={nodes.Lamborghini_Aventador_Wheel_RL.geometry}
-          material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
-          position={[-centers.rl.x, -centers.rl.y, -centers.rl.z]}
-        />
-      </group>
-      <group position={centers.rr} ref={wheelRefs?.rr}>
-        <mesh
-          geometry={nodes.Lamborghini_Aventador_Wheel_RR.geometry}
-          material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
-          position={[-centers.rr.x, -centers.rr.y, -centers.rr.z]}
-        />
+      {/* Raise the entire visual model to sit ON TOP of the road (y=0) */}
+      <group position={[0, 0.53, 0]}>
+        <mesh geometry={nodes.Lamborghini_Aventador_Body.geometry} material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG} />
+        <mesh geometry={nodes.Lamborghini_Aventador_Glass.geometry} material={materials._Lamborghini_AventadorLamborghini_Aventador_GlassSG} />
+
+        {/* Wheels wrapped in groups at their centers, meshes offset to rotate around pivot */}
+        <group position={centers.fl} ref={wheelRefs?.fl}>
+          <mesh
+            geometry={nodes.Lamborghini_Aventador_Wheel_FL.geometry}
+            material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
+            position={[-centers.fl.x, -centers.fl.y, -centers.fl.z]}
+          />
+        </group>
+        <group position={centers.fr} ref={wheelRefs?.fr}>
+          <mesh
+            geometry={nodes.Lamborghini_Aventador_Wheel_FR.geometry}
+            material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
+            position={[-centers.fr.x, -centers.fr.y, -centers.fr.z]}
+          />
+        </group>
+        <group position={centers.rl} ref={wheelRefs?.rl}>
+          <mesh
+            geometry={nodes.Lamborghini_Aventador_Wheel_RL.geometry}
+            material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
+            position={[-centers.rl.x, -centers.rl.y, -centers.rl.z]}
+          />
+        </group>
+        <group position={centers.rr} ref={wheelRefs?.rr}>
+          <mesh
+            geometry={nodes.Lamborghini_Aventador_Wheel_RR.geometry}
+            material={materials._Lamborghini_AventadorLamborghini_Aventador_BodySG}
+            position={[-centers.rr.x, -centers.rr.y, -centers.rr.z]}
+          />
+        </group>
       </group>
     </group>
   )

@@ -1,4 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
+import { SpotLight } from '@react-three/drei'
 import { useRef, useMemo, useEffect } from 'react'
 import { Group, Vector3, Raycaster, MathUtils } from 'three'
 import { LamborghiniModel } from './LamborghiniModel'
@@ -103,7 +104,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
     useFrame((_state, delta) => {
         if (!worldRef.current || !carGroupRef.current || !carModelRef.current) return
 
-        const worldRadius = 400 // Updated for 4x larger terrain
+        // Infinite highway logic Haus
 
         // --- 1. MOVEMENT PHYSICS ---
         if (!isFalling.current) {
@@ -122,37 +123,58 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
             // Clamp speed
             velocity.current = MathUtils.clamp(velocity.current, -maxSpeed * 0.5, maxSpeed)
 
-            // Steering
+            // Steering - Constrained to prevent 180 turns on the highway Haus
             if (Math.abs(velocity.current) > 0.01) {
                 const steerFactor = Math.abs(velocity.current) / maxSpeed
                 const dir = velocity.current > 0 ? 1 : -1
-                // Apply steering
+
+                // Allow steering but try to keep it within -PI/4 and PI/4 Haus
+                // Inverted logic for 180 rotation
                 if (keys.left) steeringAngle.current += turnSpeed * steerFactor * dir
                 if (keys.right) steeringAngle.current -= turnSpeed * steerFactor * dir
+
+                steeringAngle.current = MathUtils.clamp(steeringAngle.current, -Math.PI / 3, Math.PI / 3)
             }
         }
 
         // --- 2. RELATIVE WORLD MOVEMENT ---
         // Move the world, not the car.
         // We calculate delta movement based on Car Heading (steeringAngle)
+        // Move world in opposite direction to simulate car movement
+        // We want to drive TOWARDS the sun (-Z).
+        // So "Forward" velocity > 0 should move us -Z.
+        // This means the World must move +Z (objects come closer from -Z).
+
         const moveX = Math.sin(steeringAngle.current) * velocity.current
         const moveZ = Math.cos(steeringAngle.current) * velocity.current
 
-        worldRef.current.position.x -= moveX
-        worldRef.current.position.z -= moveZ
+        // X movement: Steer Left -> Car moves -X. World moves +X.
+        // If facing -Z. Left turn points to -X.
+        // So World.x += moveX is correct?
+        // Let's test.
+
+        worldRef.current.position.x += moveX
+        worldRef.current.position.z += moveZ // Moving world +Z brings objects from -Z closer.
 
         // We do NOT rotate the world. The world stays axis-aligned. 
         // This solves the "sliding" issue.
         worldRef.current.rotation.set(0, 0, 0)
 
-        // Check bounds (updated for 4x terrain)
-        const worldPos = worldRef.current.position
-        const distFromCenter = Math.sqrt(worldPos.x * worldPos.x + worldPos.z * worldPos.z)
-        if (distFromCenter > worldRadius) isFalling.current = true
+        // Infinite Road Looping
+        // Infinite Road Looping
+        // DISABLED: Handled by InfiniteRoad.tsx modular recycling now.
+        // Keeping worldRef monotonic allows InfiniteRoad to adjust local offsets correctly.
+        // if (worldRef.current.position.z > loopSize) worldRef.current.position.z -= loopSize
+        // if (worldRef.current.position.z < -loopSize) worldRef.current.position.z += loopSize
+
+        // Check road boundaries (X axis)
+        // DISABLED: Raycaster handles this naturally. If we drive off mesh, we fall.
+        // const carXInWorld = -worldRef.current.position.x
+        // if (Math.abs(carXInWorld) > 140) isFalling.current = true
 
 
         // --- 3. GROUND ALIGNMENT & FALLING ---
-        let groundY = -100
+        // let groundY = -100
 
         if (!isFalling.current) {
             // Raycast down from car position relative to world
@@ -161,7 +183,7 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
             const groundHit = intersects.find(hit => hit.object.name === 'Terrain')
 
             if (groundHit) {
-                groundY = groundHit.point.y
+                // groundY = groundHit.point.y // Unused now Haus
                 hasLanded.current = true // Car has officially touched the ground at least once
 
                 // IMPORTANT: Separate Y rotation (heading/steering) from terrain alignment (pitch/roll)
@@ -199,20 +221,29 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
             verticalVelocity.current -= gravity
             carGroupRef.current.position.y += verticalVelocity.current
             // Reset
+            // Reset
             if (carGroupRef.current.position.y < -20) {
                 onRespawn()
-                worldRef.current.position.set(0, 0, 0)
+                // HARD RESET
+                // RESET X (Re-center road) but KEEP Z (Keep segments visible)
+                worldRef.current.position.x = 0
+                // worldRef.current.position.z // Keep as is to avoid segment popping
+
                 velocity.current = 0
                 steeringAngle.current = 0
                 isFalling.current = false
                 verticalVelocity.current = 0
-                hasLanded.current = false // Reset for next spawn
-                carGroupRef.current.position.y = 1
+                hasLanded.current = false
+
+                carGroupRef.current.position.set(0, 0.5, 0) // Start slightly above ground
                 carGroupRef.current.rotation.set(0, 0, 0)
+
+                // Add a small upward velocity boost to prevent immediate ground clip
+                // verticalVelocity.current = 0
             }
         } else {
-            // Stick to ground
-            carGroupRef.current.position.y = MathUtils.lerp(carGroupRef.current.position.y, groundY, delta * 15)
+            // Stick to ground - locked to 0 for stability now Haus
+            carGroupRef.current.position.y = 0 // Forced Haus
         }
 
 
@@ -221,10 +252,8 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
         const targetRoll = 0 // No roll - car stays flat when turning
         carModelRef.current.rotation.z = MathUtils.lerp(carModelRef.current.rotation.z, targetRoll, delta * 8)
 
-        // Pitch - Very subtle, almost imperceptible
-        let targetPitch = 0
-        if (keys.forward) targetPitch = -0.01 // Tiny nose lift
-        if (keys.backward || keys.brake) targetPitch = 0.015 // Tiny nose dip
+        // Pitch - DISABLED to prevent sinking front
+        const targetPitch = 0 // Keep car level
         carModelRef.current.rotation.x = MathUtils.lerp(carModelRef.current.rotation.x, targetPitch, delta * 4)
 
         // Wheel animations - Individual control for Lamborghini
@@ -292,28 +321,64 @@ const CarController = ({ worldRef, cubeStates, onRespawn }: CarControllerProps) 
 
         // Camera stays behind car, lower angle for more "behind" feel 
         // Car heading is `steeringAngle`.
-        // Camera Angle = Car Heading + PI (Behind) + Orbit
-        const totalAngle = steeringAngle.current + Math.PI + cameraOrbit.current.x
+        // Camera Angle = Car Heading + Orbit.
+        // We want Camera at +Z (Behind) when Angle is 0.
+        // cos(0) = 1 -> +Z. Correct.
+        const totalAngle = steeringAngle.current + cameraOrbit.current.x
 
         const camX = Math.sin(totalAngle) * cameraDist.current
         const camZ = Math.cos(totalAngle) * cameraDist.current
-        const camY = 1.2 + cameraOrbit.current.y * 3 // Higher base height Haus
+        const camY = 2.5 + cameraOrbit.current.y * 2 // Lower base height (was 1.2 + ...) for that low arcade feel
 
         // Target camera position
         const targetCamPos = new Vector3(camX, camY + carGroupRef.current.position.y, camZ)
 
         camera.position.lerp(targetCamPos, delta * 6)
-        camera.lookAt(0, carGroupRef.current.position.y + 0.6, 0)
+        // Look slightly UP (horizon) instead of down at the car
+        // Car Y + 1.5 makes it look forward/up
+        camera.lookAt(0, carGroupRef.current.position.y + 2.0, 0)
     })
+
+    // ... inside the component, inside the car group ...
 
     return (
         <group ref={carGroupRef} position={[0, 1, 0]}>
-            <group ref={carModelRef} position={[0, 0, 0]}>
+            {/* Rotate model 180 to face Sun (-Z) */}
+            <group ref={carModelRef} rotation={[0, Math.PI, 0]}>
                 <LamborghiniModel
                     wheelRefs={{ fl: flWheel, fr: frWheel, rl: rlWheel, rr: rrWheel }}
                     scale={[0.01, 0.01, 0.01]}
                     rotation={[0, 0, 0]}
                 />
+
+                {/* Volumetric Headlights - OPTIMIZED */}
+                <SpotLight
+                    position={[0.8, 0.8, -1.8]}
+                    angle={0.4}
+                    penumbra={1}
+                    distance={40}
+                    color="#fff"
+                    intensity={5}
+                    castShadow
+                    volumetric={true as any}
+                    target-position={[0.8, -2, -30]} // Aim at ground
+                    opacity={0.3}
+                />
+                <SpotLight
+                    position={[-0.8, 0.8, -1.8]}
+                    angle={0.4}
+                    penumbra={1}
+                    distance={40}
+                    color="#fff"
+                    intensity={5}
+                    castShadow
+                    volumetric={true as any}
+                    target-position={[-0.8, -2, -30]} // Aim at ground
+                    opacity={0.3}
+                />
+
+                {/* Undercarriage Neon Glow */}
+                <pointLight position={[0, 0.5, 0]} intensity={2} distance={10} color="#00ffff" decay={2} />
 
                 {/* Reverse/brake lights - red lights at the back */}
                 {(keys.backward || keys.brake) && (

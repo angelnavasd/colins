@@ -1,10 +1,14 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Sky, Stars } from '@react-three/drei'
+import { Stars, Sparkles, Grid } from '@react-three/drei'
 import { Suspense, useState, useRef } from 'react'
-import { Group, Vector3 } from 'three'
-import Terrain from './components/Terrain'
+import { Group, Vector3, Fog, Color } from 'three'
 import CarController from './components/CarController'
+import { Sun } from './components/Sun'
+import { InfiniteRoad } from './components/InfiniteRoad'
+import { SideProps } from './components/SideProps'
+import { HorizonSkyline } from './components/HorizonSkyline'
 import type { CubeState } from './components/CarController'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 
 // Cube component that reads from shared state
 function Cube({ state }: { state: CubeState }) {
@@ -60,9 +64,9 @@ function Game() {
   const cubeStates = useRef<CubeState[]>(
     Array.from({ length: 40 }, () => ({
       position: new Vector3(
-        (Math.random() - 0.5) * 180,
+        (Math.random() - 0.5) * 35, // Stay on or near the road Haus Haus Haus
         1,
-        (Math.random() - 0.5) * 180
+        (Math.random() - 0.5) * 400 // Distributed along a longer stretch Haus Haus Haus Haus
       ),
       velocity: new Vector3(0, 0, 0),
       fallen: false
@@ -82,37 +86,70 @@ function Game() {
     })
   }
 
+  // Set scene fog and background - Lighter sky to contrast dark buildings
+  useFrame(({ scene }) => {
+    if (!scene.fog || (scene.fog as any).isFogExp2) {
+      // Lighter purple sky so stars pop against it
+      scene.fog = new Fog('#1a0033', 15, 250)
+      scene.background = new Color('#0d001a') // Dark purple sky (not black)
+    }
+  })
+
   return (
     <>
-      <Sky sunPosition={[100, 20, 50]} turbidity={8} rayleigh={0.3} />
-      <Stars radius={300} depth={60} count={2000} />
-      <fog attach="fog" args={['#ccaa88', 60, 200]} />
+      <Stars radius={400} depth={100} count={5000} factor={6} saturation={0} fade speed={2} />
 
-      <ambientLight intensity={1.2} /> {/* Brighter ambient for better overall lighting */}
-      <directionalLight position={[50, 80, 30]} intensity={2.5} castShadow /> {/* Stronger main light */}
-      <directionalLight position={[-30, 60, -20]} intensity={1.5} /> {/* Fill light from opposite side */}
-      <spotLight
-        position={[0, 40, 0]}
-        angle={0.6}
-        penumbra={0.5}
-        intensity={1.5}
-        castShadow
-        target-position={[0, 0, 0]}
-      /> {/* Spotlight following the car */}
-      <hemisphereLight args={['#ffaa77', '#554433', 0.8]} /> {/* Stronger hemisphere */}
+      {/* Floating atmospheric particles */}
+      <Sparkles count={100} scale={[50, 20, 200]} size={2} speed={0.3} color="#ff88ff" opacity={0.5} />
 
-      {/* Car at origin */}
+      {/* RETROWAVE GRID - Subtle infinite grid */}
+      <Grid
+        position={[0, -0.1, 0]}
+        args={[300, 300]}
+        cellSize={8}
+        cellThickness={0.5}
+        cellColor="#003344"
+        sectionSize={40}
+        sectionThickness={1}
+        sectionColor="#004455"
+        fadeDistance={250}
+        fadeStrength={2}
+        infiniteGrid
+      />
+
+      {/* HORIZON SKYLINE - Depth */}
+      <HorizonSkyline />
+
+      {/* DARKER AMBIENT - Let point lights do the work */}
+      <ambientLight intensity={0.3} color="#200040" />
+
+      {/* STRONG SUN LIGHT from horizon */}
+      <directionalLight position={[0, 50, -200]} intensity={2} color="#ff6600" />
+      <directionalLight position={[0, 30, -100]} intensity={1} color="#ff00cc" />
+
+      {/* Post Processing - Clean bloom only */}
+      <EffectComposer>
+        <Bloom luminanceThreshold={0.7} luminanceSmoothing={0.9} height={200} intensity={0.8} mipmapBlur />
+      </EffectComposer>
+
+
+      {/* Static Background Elements */}
+      <Sun />
+
+      {/* Car Control & Moving World */}
       <CarController
         worldRef={worldRef}
         cubeStates={cubeStates}
         onRespawn={handleRespawn}
       />
 
-      {/* World moves around car */}
+      {/* The Moving World Group */}
       <group ref={worldRef}>
-        <Terrain />
+        {/* Replaced Terrain with Procedural System */}
+        <InfiniteRoad />
+        <SideProps />
 
-        {/* Cubes with lunar physics */}
+        {/* Keeping Cubes for gameplay */}
         {cubeStates.current.map((state, i) => (
           <Cube key={i} state={state} />
         ))}
